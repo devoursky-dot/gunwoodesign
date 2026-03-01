@@ -1,14 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { motion, useScroll, useTransform, useSpring } from 'framer-motion'; //
+import { motion, useScroll, useTransform, useSpring, AnimatePresence } from 'framer-motion';
 import ApartmentBlueprint from './assets/apartment.svg';
 
 const App = () => {
-  // 1. 마우스 시선 반응(Parallax)을 위한 좌표 계산
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [driveImages, setDriveImages] = useState([]);
 
+  // --- [중요] 병우님의 구글 설정값 입력 ---
+  const API_KEY = "AIzaSyCiVnPpyg9xkhkiacbFmkE05tjy4Z7omko";
+  const FOLDER_ID = "19-1jVm3B6FD7TXOFu156H-b92uGZqU5g";
+
+  // 1. 구글 폴더 내 이미지 파일 목록 자동 가져오기
+  useEffect(() => {
+    const fetchImages = async () => {
+      try {
+        const response = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,thumbnailLink,description)&key=${API_KEY}`
+        );
+        const data = await response.json();
+        if (data.files) setDriveImages(data.files);
+      } catch (err) {
+        console.error("이미지 로드 실패:", err);
+      }
+    };
+    fetchImages();
+  }, [API_KEY, FOLDER_ID]);
+
+  // 2. 마우스 시선 반응 애니메이션
   useEffect(() => {
     const handleMouseMove = (e) => {
-      // 마우스 좌표를 중앙 기준(-0.5 ~ 0.5)으로 정규화
+      if (isGalleryOpen) return;
       setMousePos({
         x: (e.clientX / window.innerWidth) - 0.5,
         y: (e.clientY / window.innerHeight) - 0.5,
@@ -16,16 +38,12 @@ const App = () => {
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [isGalleryOpen]);
 
-  // 2. 스크롤 반응(입체적 떠오름) 설정
-  const { scrollY } = useScroll(); // 현재 스크롤 위치 감지
-  
-  // 스크롤에 따라 배경이 위로 떠오르고 투명해지는 변화값 설정
-  const yRange = useTransform(scrollY, [0, 600], [0, -150]); 
-  const opacityRange = useTransform(scrollY, [0, 400], [0.5, 0.05]); 
-  
-  // 끊김 없는 부드러운 움직임을 위한 스프링 효과 적용
+  // 3. 스크롤 반응 애니메이션
+  const { scrollY } = useScroll();
+  const yRange = useTransform(scrollY, [0, 600], [0, -150]);
+  const opacityRange = useTransform(scrollY, [0, 400], [0.5, 0.05]);
   const smoothY = useSpring(yRange, { stiffness: 100, damping: 30 });
 
   return (
@@ -33,169 +51,164 @@ const App = () => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
         body { 
-          margin: 0; 
-          padding: 0; 
-          background-color: #000000; 
-          color: #ffffff; 
-          font-family: 'Helvetica Neue', sans-serif;
-          overflow-x: hidden;
+          margin: 0; padding: 0; background-color: #000; color: #fff; 
+          font-family: 'Helvetica Neue', sans-serif; overflow-x: hidden;
         }
         * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #444; }
       `}</style>
 
-      {/* 메인 컨테이너: 배경을 화면에 고정(Fixed) */}
       <div style={containerStyle}>
-        
-        {/* A. 배경 레이어: 병우님의 설계도 + 마우스 & 스크롤 상호작용 */}
+        {/* A. 배경 레이어 (설계도) */}
         <motion.div 
           style={{
             ...backgroundStyle,
             backgroundImage: `url(${ApartmentBlueprint})`,
-            y: smoothY, // 스크롤 시 위로 이동
-            opacity: opacityRange, // 스크롤 시 투명해짐
-            x: mousePos.x * 40, // 마우스 방향에 따른 미세 가로 이동
-            rotateX: mousePos.y * -10, // 마우스 방향에 따른 입체 회전
+            y: smoothY,
+            opacity: isGalleryOpen ? 0.2 : opacityRange,
+            x: mousePos.x * 40,
+            rotateX: mousePos.y * -10,
             rotateY: mousePos.x * 10,
             filter: 'invert(1) brightness(1.5)', 
           }}
         />
 
-        {/* B. 콘텐츠 레이어: 한 줄 3D 타이틀 */}
-        <div style={overlayStyle}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-          >
-            <span style={subTitleStyle}>ORIGINAL ARCHITECTURAL DESIGN</span>
-
-            {/* 한 줄 배치 및 검증된 3D 텍스트 그림자 효과 */}
-            <h1 style={mainTitleStyle}>
-              GUNWOO DESIGN
-            </h1>
-
-            <div style={lineStyle} />
-            
-            <motion.button 
-              whileHover={{ scale: 1.05, backgroundColor: '#fff', color: '#000', borderColor: '#fff' }}
-              whileTap={{ scale: 0.95 }}
-              style={buttonStyle}
+        {/* B. 메인 타이틀 섹션 (갤러리가 닫혀있을 때만 표시) */}
+        <AnimatePresence>
+          {!isGalleryOpen && (
+            <motion.div 
+              style={overlayStyle}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              transition={{ duration: 0.8 }}
             >
-              EXPLORE MODEL
-            </motion.button>
-          </motion.div>
-        </div>
+              <span style={subTitleStyle}>ORIGINAL ARCHITECTURAL DESIGN</span>
+              <h1 style={mainTitleStyle}>GUNWOO DESIGN</h1>
+              <div style={lineStyle} />
+              <motion.button 
+                onClick={() => setIsGalleryOpen(true)}
+                whileHover={{ scale: 1.05, backgroundColor: '#fff', color: '#000' }}
+                style={buttonStyle}
+              >
+                EXPLORE MODEL ({driveImages.length})
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* C. 하단 장식 요소 */}
+        {/* C. 자동 스크롤 필름 갤러리 오버레이 */}
+        <AnimatePresence>
+          {isGalleryOpen && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={galleryWrapperStyle}
+            >
+              <button onClick={() => setIsGalleryOpen(false)} style={closeButtonStyle}>
+                CLOSE GALLERY [×]
+              </button>
+
+              <div style={filmTrackStyle}>
+                {driveImages.map((file, index) => (
+                  <motion.div 
+                    key={file.id}
+                    initial={{ y: 100, opacity: 0 }}
+                    whileInView={{ y: 0, opacity: 1 }} // 스크롤 시 등장 효과
+                    viewport={{ once: true, margin: "-100px" }}
+                    style={filmFrameStyle}
+                  >
+                    <div style={frameLabelStyle}>PROJECT_SOURCE: {file.name}</div>
+                    <img 
+                      src={file.thumbnailLink ? file.thumbnailLink.replace('=s220', '=s1600') : `https://drive.google.com/uc?export=view&id=${file.id}`}
+                      alt={file.name}
+                      style={imageStyle}
+                      referrerPolicy="no-referrer"
+                    />
+                    {file.description && (
+                      <div style={captionStyle}>
+                        {file.description}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div style={cornerDecoration}>SCALE 1:100 / CUSTOM SVG RENDER</div>
       </div>
 
-      {/* 스크롤 테스트용 하단 공간 */}
-      <div style={scrollContentStyle}>
-        <p style={{ color: '#444' }}>SCROLL DOWN TO REVEAL MORE PROJECTS</p>
-      </div>
+      {!isGalleryOpen && <div style={scrollContentStyle} />}
     </>
   );
 };
 
-// --- 스타일 정의 ---
+// --- 스타일링 정의 ---
 
 const containerStyle = {
-  height: '100vh',
-  width: '100vw',
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 1,
-  perspective: '1000px', // 3D 회전 효과를 위한 원근감 설정
+  height: '100vh', width: '100vw', position: 'fixed',
+  top: 0, left: 0, display: 'flex', alignItems: 'center',
+  justifyContent: 'center', zIndex: 1, perspective: '1000px',
 };
 
 const backgroundStyle = {
-  position: 'absolute',
-  top: '-10%', // 마우스 움직임 여백을 위해 살짝 크게 설정
-  left: '-10%',
-  width: '120%',
-  height: '120%',
-  backgroundSize: 'contain',
-  backgroundRepeat: 'no-repeat',
-  backgroundPosition: 'center',
-  zIndex: 1,
+  position: 'absolute', width: '120%', height: '120%',
+  backgroundSize: 'contain', backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'center', zIndex: 1,
 };
 
-const overlayStyle = {
-  position: 'relative',
-  zIndex: 2,
-  textAlign: 'center',
-  width: '100%',
-  padding: '0 5%',
-  background: 'radial-gradient(circle, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 75%)',
-};
-
-const subTitleStyle = {
-  fontSize: '11px',
-  letterSpacing: '10px',
-  color: '#888',
-  display: 'block',
-  marginBottom: '20px'
-};
+const overlayStyle = { position: 'relative', zIndex: 2, textAlign: 'center' };
 
 const mainTitleStyle = {
-  fontFamily: "'Anton', sans-serif", 
-  fontSize: 'clamp(3rem, 12vw, 15rem)', // 한 줄 배치를 위한 최적 크기
-  fontWeight: '400',
-  textTransform: 'uppercase',
-  margin: '0 0 40px 0',
-  lineHeight: '1',
-  letterSpacing: '2px',
-  whiteSpace: 'nowrap',
-  color: '#ffffff',
-  // 인터넷에서 검증된 고해상도 3D 텍스트 강조 효과
-  textShadow: `
-    0 1px 0 #d9d9d9, 0 2px 0 #d2d2d2, 0 3px 0 #cccccc, 
-    0 4px 0 #c6c6c6, 0 5px 0 #bfbfbf, 
-    0 6px 1px rgba(0,0,0,0.1), 0 0 10px rgba(0,0,0,0.1), 
-    0 2px 5px rgba(0,0,0,0.3), 0 5px 10px rgba(0,0,0,0.2), 
-    0 10px 20px rgba(0,0,0,0.25), 0 20px 30px rgba(0,0,0,0.2)
-  `
+  fontFamily: "'Anton', sans-serif", fontSize: 'clamp(3rem, 12vw, 15rem)',
+  textTransform: 'uppercase', margin: '0 0 40px 0', lineHeight: '1',
+  whiteSpace: 'nowrap', color: '#ffffff',
+  textShadow: `0 1px 0 #d9d9d9, 0 5px 0 #bfbfbf, 0 10px 20px rgba(0,0,0,0.4)`
 };
 
-const lineStyle = {
-  width: '80px',
-  height: '1px',
-  backgroundColor: '#444',
-  margin: '0 auto 50px'
+const galleryWrapperStyle = {
+  position: 'absolute', top: 0, left: '20%', width: '60%', height: '100%',
+  backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10, overflowY: 'auto',
+  padding: '120px 0', backdropFilter: 'blur(5px)',
+  borderLeft: '1px solid rgba(255,255,255,0.1)',
+  borderRight: '1px solid rgba(255,255,255,0.1)'
 };
 
-const buttonStyle = {
-  padding: '14px 45px',
-  fontSize: '12px',
-  backgroundColor: 'transparent',
-  color: '#fff',
-  border: '1px solid #444',
-  cursor: 'pointer',
-  letterSpacing: '4px',
-  transition: '0.4s',
-  textTransform: 'uppercase'
+const filmTrackStyle = {
+  width: '100%', maxWidth: '1000px', margin: '0 auto',
+  display: 'flex', flexDirection: 'column', gap: '100px', padding: '0 20px'
 };
 
-const cornerDecoration = {
-  position: 'absolute',
-  bottom: '40px',
-  right: '40px',
-  fontSize: '10px',
-  color: '#444',
-  letterSpacing: '2px'
+const filmFrameStyle = { borderLeft: '1px solid #333', paddingLeft: '30px' };
+
+const imageStyle = {
+  width: '100%', height: 'auto', display: 'block',
+  filter: 'contrast(1.1) grayscale(10%)', borderRadius: '2px'
 };
 
-const scrollContentStyle = {
-  height: '200vh',
-  marginTop: '100vh',
-  display: 'flex',
-  justifyContent: 'center',
-  paddingTop: '100px'
+const captionStyle = {
+  marginTop: '20px', fontSize: '13px', color: '#ccc',
+  lineHeight: '1.6', whiteSpace: 'pre-wrap',
+  fontFamily: '"Helvetica Neue", sans-serif', fontWeight: '300'
 };
+
+const frameLabelStyle = {
+  fontSize: '10px', color: '#555', letterSpacing: '2px', 
+  marginBottom: '15px', fontFamily: 'monospace'
+};
+
+const closeButtonStyle = {
+  position: 'fixed', top: '40px', right: '40px', background: 'none',
+  border: 'none', color: '#fff', fontSize: '12px', letterSpacing: '3px',
+  cursor: 'pointer', zIndex: 11
+};
+
+const subTitleStyle = { fontSize: '11px', letterSpacing: '10px', color: '#888', marginBottom: '20px', display: 'block' };
+const lineStyle = { width: '80px', height: '1px', backgroundColor: '#444', margin: '0 auto 50px' };
+const buttonStyle = { padding: '14px 45px', fontSize: '12px', backgroundColor: 'transparent', color: '#fff', border: '1px solid #444', cursor: 'pointer', letterSpacing: '4px' };
+const cornerDecoration = { position: 'absolute', bottom: '40px', right: '40px', fontSize: '10px', color: '#444', letterSpacing: '2px' };
+const scrollContentStyle = { height: '200vh' };
 
 export default App;
