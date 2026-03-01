@@ -63,6 +63,7 @@ const App = () => {
         body { 
           margin: 0; padding: 0; background-color: #000; color: #fff; 
           font-family: 'Helvetica Neue', sans-serif; overflow-x: hidden;
+          overscroll-behavior: none; /* 터치 시 당겨서 새로고침 방지 */
         }
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; }
@@ -117,13 +118,7 @@ const App = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{
-                ...galleryWrapperStyle,
-                width: isMobile ? '100%' : '60%', // 모바일은 전체 너비
-                left: isMobile ? '0' : '20%',     // 모바일은 중앙 정렬 오프셋 제거
-                borderLeft: isMobile ? 'none' : galleryWrapperStyle.borderLeft,
-                borderRight: isMobile ? 'none' : galleryWrapperStyle.borderRight
-              }}
+              style={galleryWrapperStyle} // 모바일에서도 60% 너비 유지 (기본 스타일 적용)
             >
               <button onClick={() => setIsGalleryOpen(false)} style={closeButtonStyle}>
                 CLOSE [X]
@@ -241,6 +236,6 @@ const lineStyle = { width: '80px', height: '1px', backgroundColor: '#444', margi
 const buttonStyle = { padding: '14px 45px', fontSize: '12px', backgroundColor: 'transparent', color: '#fff', border: '1px solid #444', cursor: 'pointer', letterSpacing: '4px' };
 const cornerDecoration = { position: 'absolute', bottom: '40px', right: '40px', fontSize: '10px', color: '#444', letterSpacing: '2px' };
 const scrollContentStyle = { height: '200vh' };
-const scrollContainerStyle = { height: '100%', overflowY: 'auto', padding: '120px 0', width: '100%' };
+const scrollContainerStyle = { height: '100%', overflowY: 'auto', padding: '120px 0', width: '100%', overscrollBehavior: 'contain' };
 
 export default App;
