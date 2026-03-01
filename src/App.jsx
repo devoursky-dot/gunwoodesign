@@ -6,6 +6,16 @@ const App = () => {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [driveImages, setDriveImages] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // 0. 화면 크기 변경 감지 (반응형)
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // --- [중요] 병우님의 구글 설정값 입력 ---
   const API_KEY = "AIzaSyCiVnPpyg9xkhkiacbFmkE05tjy4Z7omko";
@@ -16,7 +26,7 @@ const App = () => {
     const fetchImages = async () => {
       try {
         const response = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&fields=files(id,name,thumbnailLink,description)&key=${API_KEY}`
+          `https://www.googleapis.com/drive/v3/files?q='${FOLDER_ID}'+in+parents+and+mimeType+contains+'image/'&orderBy=name&fields=files(id,name,thumbnailLink,description)&key=${API_KEY}`
         );
         const data = await response.json();
         if (data.files) setDriveImages(data.files);
@@ -82,13 +92,17 @@ const App = () => {
               exit={{ opacity: 0, scale: 0.9, y: -20 }}
               transition={{ duration: 0.8 }}
             >
-              <span style={subTitleStyle}>ORIGINAL ARCHITECTURAL DESIGN</span>
+              <span style={{
+                ...subTitleStyle,
+                letterSpacing: isMobile ? '2px' : '10px', // 모바일에서는 자간 축소
+                fontSize: isMobile ? '10px' : '11px'
+              }}>ORIGINAL ARCHITECTURAL DESIGN</span>
               <h1 style={mainTitleStyle}>GUNWOO DESIGN</h1>
               <div style={lineStyle} />
               <motion.button 
                 onClick={() => setIsGalleryOpen(true)}
                 whileHover={{ scale: 1.05, backgroundColor: '#fff', color: '#000' }}
-                style={buttonStyle}
+                style={{ ...buttonStyle, padding: isMobile ? '12px 30px' : '14px 45px' }}
               >
                 EXPLORE MODEL ({driveImages.length})
               </motion.button>
@@ -103,20 +117,37 @@ const App = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={galleryWrapperStyle}
+              style={{
+                ...galleryWrapperStyle,
+                width: isMobile ? '100%' : '60%', // 모바일은 전체 너비
+                left: isMobile ? '0' : '20%',     // 모바일은 중앙 정렬 오프셋 제거
+                borderLeft: isMobile ? 'none' : galleryWrapperStyle.borderLeft,
+                borderRight: isMobile ? 'none' : galleryWrapperStyle.borderRight
+              }}
             >
               <button onClick={() => setIsGalleryOpen(false)} style={closeButtonStyle}>
-                CLOSE GALLERY [×]
+                CLOSE [X]
               </button>
 
-              <div style={filmTrackStyle}>
+              <div style={scrollContainerStyle}>
+              <div style={{
+                ...filmTrackStyle,
+                columnCount: isMobile ? 1 : 2, // Grid 대신 컬럼 레이아웃 사용 (Masonry 효과)
+                columnGap: isMobile ? '10px' : '20px',
+              }}>
                 {driveImages.map((file, index) => (
                   <motion.div 
                     key={file.id}
                     initial={{ y: 100, opacity: 0 }}
                     whileInView={{ y: 0, opacity: 1 }} // 스크롤 시 등장 효과
                     viewport={{ once: true, margin: "-100px" }}
-                    style={filmFrameStyle}
+                    style={{
+                      ...filmFrameStyle,
+                      breakInside: 'avoid', // 이미지가 컬럼 사이에서 잘리지 않도록 설정
+                      marginBottom: isMobile ? '30px' : '60px', // 아이템 간 세로 간격
+                      display: 'inline-block', // 컬럼 레이아웃 배치 최적화
+                      width: '100%'
+                    }}
                   >
                     <div style={frameLabelStyle}>PROJECT_SOURCE: {file.name}</div>
                     <img 
@@ -132,6 +163,7 @@ const App = () => {
                     )}
                   </motion.div>
                 ))}
+              </div>
               </div>
             </motion.div>
           )}
@@ -170,18 +202,17 @@ const mainTitleStyle = {
 
 const galleryWrapperStyle = {
   position: 'absolute', top: 0, left: '20%', width: '60%', height: '100%',
-  backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10, overflowY: 'auto',
-  padding: '120px 0', backdropFilter: 'blur(5px)',
+  backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10, overflow: 'hidden',
+  backdropFilter: 'blur(5px)',
   borderLeft: '1px solid rgba(255,255,255,0.1)',
   borderRight: '1px solid rgba(255,255,255,0.1)'
 };
 
 const filmTrackStyle = {
-  width: '100%', maxWidth: '1000px', margin: '0 auto',
-  display: 'flex', flexDirection: 'column', gap: '100px', padding: '0 20px'
+  width: '100%', margin: '0 auto', padding: '0 10px'
 };
 
-const filmFrameStyle = { borderLeft: '1px solid #333', paddingLeft: '30px' };
+const filmFrameStyle = { borderLeft: '1px solid #333', paddingLeft: '15px' };
 
 const imageStyle = {
   width: '100%', height: 'auto', display: 'block',
@@ -200,7 +231,7 @@ const frameLabelStyle = {
 };
 
 const closeButtonStyle = {
-  position: 'fixed', top: '40px', right: '40px', background: 'none',
+  position: 'absolute', top: '30px', right: '30px', background: 'none',
   border: 'none', color: '#fff', fontSize: '12px', letterSpacing: '3px',
   cursor: 'pointer', zIndex: 11
 };
@@ -210,5 +241,6 @@ const lineStyle = { width: '80px', height: '1px', backgroundColor: '#444', margi
 const buttonStyle = { padding: '14px 45px', fontSize: '12px', backgroundColor: 'transparent', color: '#fff', border: '1px solid #444', cursor: 'pointer', letterSpacing: '4px' };
 const cornerDecoration = { position: 'absolute', bottom: '40px', right: '40px', fontSize: '10px', color: '#444', letterSpacing: '2px' };
 const scrollContentStyle = { height: '200vh' };
+const scrollContainerStyle = { height: '100%', overflowY: 'auto', padding: '120px 0', width: '100%' };
 
 export default App;
